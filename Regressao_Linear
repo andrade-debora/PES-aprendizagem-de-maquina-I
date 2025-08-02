@@ -1,0 +1,272 @@
+# ====================================================================================================
+# Nome do Arquivo : Regressao_Linear.py
+# Autores         : Débora Leandro de Andrade e Juan Diego de Paula Rollemberg
+# Curso           : PES - Colaborador Embraer
+# Disciplina      : Aprendizagem de máquina I
+# Professor       : George Darmilton
+# Data            : 03/08/2025                                                
+# ====================================================================================================
+
+"""
+Esse script tem como objetivo ler o dataset selecionado e aplicar o algoritmo Regressão Linear.
+São realizados dois treinamentos: 1) com todos os atributos
+                                  2) com apenas os atributos de maior correlação com a variável alvo
+         
+"""
+
+#%% Imports ==========================================================================================
+
+# Utilidades
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Classes do modelo de aprendizado
+from sklearn.linear_model import LinearRegression
+
+# Função para importar o dataset do site openml
+from sklearn.datasets import fetch_openml
+
+
+# Funções de avaliação dos modelos
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+
+
+#%% Inicio do programa ==========================================================================================
+# Lê o dataset como dataframe
+dataset_sklearn = fetch_openml(name="air-quality-and-pollution-assessment", version=1, as_frame=True)
+dataset = dataset_sklearn.frame
+
+#%% Pré-visualização do dataset
+dataset.head()
+
+#%% Resumo do dataset
+dataset.describe()
+
+#%% Mapeando os valores da classe para inteiro (para fins de visualização da região de decisão)
+dataset['Air_Quality'] = pd.factorize(dataset['Air_Quality'])[0]
+
+#%% Matriz de correlação - Todos os atributos
+
+correlation_matrix = dataset.corr()
+
+plt.figure(figsize=(15, 10))
+ax = sns.heatmap(
+    correlation_matrix,
+    annot=True,
+    cmap="coolwarm",
+    linewidths=0.5,
+    annot_kws={"size": 14},
+)
+
+plt.title("Correlação com a variável alvo", fontsize=20)
+plt.tight_layout()
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+
+# Aumentar fonte da legenda (colorbar)
+colorbar = ax.collections[0].colorbar
+colorbar.ax.tick_params(labelsize=14)
+
+plt.show()
+
+#%% Matriz de correlação - apenas variável alvo
+
+target_column = 'Air_Quality'
+
+correlation_matrix_for_target = correlation_matrix[[target_column]].drop(target_column)
+
+plt.figure(figsize=(15, 10))
+ax = sns.heatmap(
+    correlation_matrix_for_target,
+    annot=True,
+    cmap="coolwarm",
+    linewidths=0.5,
+    annot_kws={"size": 14},
+)
+
+plt.title("Correlação com a variável alvo", fontsize=20)
+plt.tight_layout()
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+
+# Aumentar fonte da legenda (colorbar)
+colorbar = ax.collections[0].colorbar
+colorbar.ax.tick_params(labelsize=14)
+
+plt.show()
+
+#%% Gráfico de dispersão dos atributos de maior correlação com a variável alvo
+# Como a variável alvo é categórica, o gráfico de dispersão não traz muitos insights.
+columns_without_target = dataset.drop(columns=target_column).columns
+
+for i in columns_without_target:
+
+    plt.figure(figsize=(8, 6))
+    sns.scatterplot(x=i, y=target_column, hue=target_column, data=dataset)
+    plt.title(f'Gráfico de Dispersão entre {i} e {target_column}')
+    plt.xlabel(f'{i}')
+    plt.ylabel(f'{target_column}')
+    plt.show()
+
+#%% Primeiro treinamento ==========================================================================================
+# Todos os atributos são considerados
+# -----------------------------------------------------------
+
+# Define os atributos e a variável alvo
+target_column='Air_Quality'
+X = dataset.drop(columns=target_column)
+y = dataset[target_column]
+
+# Define a semente
+seed=42
+
+# Divide o dataset em treino e teste
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, random_state=seed)
+
+#%% Faz o treinamento do modelo de regressão
+LR_model = LinearRegression()
+LR_model.fit(X_train,y_train)
+
+# %% Avaliação do modelo
+print("Coeficiente angular (a*x):", LR_model.coef_)
+print("Coeficiente Linear (b):", LR_model.intercept_)
+print("y =", LR_model.coef_[0].round(3),"x +",LR_model.intercept_.round(3))
+
+y_pred = LR_model.predict(X_test)
+
+r2 = r2_score(y_test, y_pred)
+MSE = mean_squared_error(y_test, y_pred)
+
+print("MSE:", MSE)
+print("R2_score:", r2)# %%
+
+# Visualizar coeficientes
+coef_df = pd.DataFrame({
+    'Atributo': X.columns,
+    'Coeficiente': LR_model.coef_
+})
+
+print("Coeficientes da Regressão Linear Múltipla:")
+print(coef_df)
+print(f"\nR² do modelo no conjunto de teste: {r2:.2f}")
+
+# Visualizar os coeficientes com gráfico
+plt.figure(figsize=(8, 5))
+sns.barplot(x='Coeficiente', y='Atributo', data=coef_df, palette='viridis')
+plt.title('Importância dos Atributos na Regressão Linear')
+plt.xlabel('Coeficiente')
+plt.ylabel('Atributo')
+plt.tight_layout()
+plt.show()
+
+#%% Segundo treinamento ==========================================================================================
+# Considera apenas os atributos que apresentaram maior correlação com a variável alvo.
+# -----------------------------------------------------------
+
+# Define os atributos e a variável alvo
+target_column='Air_Quality'
+X = dataset[['CO', 'SO2','NO2','Temperature','Proximity_to_Industrial_Areas']]
+y = dataset[target_column]
+
+# Define a semente
+seed=42
+
+# Divide o dataset em treino e teste
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, random_state=seed)
+
+#%% Faz o treinamento do modelo de regressão
+LR_model = LinearRegression()
+LR_model.fit(X_train,y_train)
+
+# %% Avaliação do modelo
+print("Coeficiente angular (a*x):", LR_model.coef_)
+print("Coeficiente Linear (b):", LR_model.intercept_)
+print("y =", LR_model.coef_[0].round(3),"x +",LR_model.intercept_.round(3))
+
+y_pred = LR_model.predict(X_test)
+
+r2 = r2_score(y_test, y_pred)
+MSE = mean_squared_error(y_test, y_pred)
+
+print("MSE:", MSE)
+print("R2_score:", r2)# %%
+
+# %%
+# Visualizar coeficientes
+coef_df = pd.DataFrame({
+    'Atributo': X.columns,
+    'Coeficiente': LR_model.coef_
+})
+
+print("Coeficientes da Regressão Linear Múltipla:")
+print(coef_df)
+print(f"\nR² do modelo no conjunto de teste: {r2:.2f}")
+
+# Visualizar os coeficientes com gráfico
+plt.figure(figsize=(8, 5))
+sns.barplot(x='Coeficiente', y='Atributo', data=coef_df, palette='viridis')
+plt.title('Importância dos Atributos na Regressão Linear')
+plt.xlabel('Coeficiente')
+plt.ylabel('Atributo')
+plt.tight_layout()
+plt.show()
+
+#%% Terceiro treinamento ==========================================================================================
+# Considera apenas o atributo que apresentou maior importância para a regressão ("CO")
+# -----------------------------------------------------------
+
+# Define os atributos e a variável alvo
+target_column='Air_Quality'
+X = dataset[['CO']]
+y = dataset[target_column]
+
+# Define a semente
+seed=42
+
+# Divide o dataset em treino e teste
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, random_state=seed)
+
+#%% Faz o treinamento do modelo de regressão
+LR_model = LinearRegression()
+LR_model.fit(X_train,y_train)
+
+# %% Avaliação do modelo
+print("Coeficiente angular (a*x):", LR_model.coef_)
+print("Coeficiente Linear (b):", LR_model.intercept_)
+print("y =", LR_model.coef_[0].round(3),"x +",LR_model.intercept_.round(3))
+
+y_pred = LR_model.predict(X_test)
+
+r2 = r2_score(y_test, y_pred)
+MSE = mean_squared_error(y_test, y_pred)
+
+print("MSE:", MSE)
+print("R2_score:", r2)# %%
+
+# %%
+# Visualizar coeficientes
+coef_df = pd.DataFrame({
+    'Atributo': X.columns,
+    'Coeficiente': LR_model.coef_
+})
+
+print("Coeficientes da Regressão Linear Múltipla:")
+print(coef_df)
+print(f"\nR² do modelo no conjunto de teste: {r2:.2f}")
+
+# Visualizar os coeficientes com gráfico
+plt.figure(figsize=(8, 5))
+sns.barplot(x='Coeficiente', y='Atributo', data=coef_df, palette='viridis')
+plt.title('Importância dos Atributos na Regressão Linear')
+plt.xlabel('Coeficiente')
+plt.ylabel('Atributo')
+plt.tight_layout()
+plt.show()
+
+# %%
