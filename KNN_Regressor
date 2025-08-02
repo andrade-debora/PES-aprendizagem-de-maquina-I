@@ -1,0 +1,299 @@
+
+# ====================================================================================================
+# Nome do Arquivo : Projeto_KNN_Regressor.py
+# Autores         : Débora Leandro de Andrade e Juan Diego de Paula Rollemberg
+# Curso           : PES - Colaborador Embraer
+# Disciplina      : Aprendizagem de máquina I
+# Professor       : George Darmilton
+# Data            : 03/08/2025                                                
+# ====================================================================================================
+
+"""
+Esse script tem como objetivo ler o dataset selecionado e aplicar o algoritmo KNN para regressão.
+São realizados dois treinamentos: 1) com todos os atributos
+                                  2) com apenas os atributos de maior correlação com a variável alvo
+         
+"""
+
+#%% Imports ==========================================================================================
+
+# Utilidades
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Classes do modelo de aprendizado
+from sklearn.neighbors import KNeighborsRegressor
+
+# Função para importar o dataset do site openml
+from sklearn.datasets import fetch_openml
+
+
+# Funções de avaliação dos modelos
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.preprocessing import StandardScaler
+
+
+
+#%% Inicio do programa ==========================================================================================
+# Lê o dataset como dataframe
+dataset_sklearn = fetch_openml(name="air-quality-and-pollution-assessment", version=1, as_frame=True)
+dataset = dataset_sklearn.frame
+
+#%% Pré-visualização do dataset
+dataset.head()
+
+#%% Resumo do dataset
+dataset.describe()
+
+#%% Mapeando os valores da classe para inteiro (para fins de visualização da região de decisão)
+dataset['Air_Quality'] = pd.factorize(dataset['Air_Quality'])[0]
+
+#%% Matriz de correlação - Todos os atributos
+
+correlation_matrix = dataset.corr()
+
+plt.figure(figsize=(15, 10))
+ax = sns.heatmap(
+    correlation_matrix,
+    annot=True,
+    cmap="coolwarm",
+    linewidths=0.5,
+    annot_kws={"size": 14},
+)
+
+plt.title("Correlação com a variável alvo", fontsize=20)
+plt.tight_layout()
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+
+# Aumentar fonte da legenda (colorbar)
+colorbar = ax.collections[0].colorbar
+colorbar.ax.tick_params(labelsize=14)
+
+plt.show()
+
+#%% Matriz de correlação - apenas variável alvo
+
+target_column = 'Air_Quality'
+
+correlation_matrix_for_target = correlation_matrix[[target_column]].drop(target_column)
+
+plt.figure(figsize=(15, 10))
+ax = sns.heatmap(
+    correlation_matrix_for_target,
+    annot=True,
+    cmap="coolwarm",
+    linewidths=0.5,
+    annot_kws={"size": 14},
+)
+
+plt.title("Correlação com a variável alvo", fontsize=20)
+plt.tight_layout()
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+
+# Aumentar fonte da legenda (colorbar)
+colorbar = ax.collections[0].colorbar
+colorbar.ax.tick_params(labelsize=14)
+
+plt.show()
+
+#%% Gráfico de dispersão dos atributos de maior correlação com a variável alvo
+# Como a variável alvo é categórica, o gráfico de dispersão não traz muitos insights.
+columns_without_target = dataset.drop(columns=target_column).columns
+
+for i in columns_without_target:
+
+    plt.figure(figsize=(8, 6))
+    sns.scatterplot(x=i, y=target_column, hue=target_column, data=dataset)
+    plt.title(f'Gráfico de Dispersão entre {i} e {target_column}')
+    plt.xlabel(f'{i}')
+    plt.ylabel(f'{target_column}')
+    plt.show()
+
+#%% Primeiro treinamento ==========================================================================================
+# Todos os atributos são considerados
+# -----------------------------------------------------------
+
+# Define os atributos e a variável alvo
+target_column='Air_Quality'
+X = dataset.drop(columns=target_column)
+y = dataset[target_column]
+
+# Define a semente
+seed=42
+
+# Divide o dataset em treino e teste
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, random_state=seed)
+
+#%% Algoritmo iterativo para escolher melhor N e métrica
+
+metrics_to_eval = ["euclidean", "manhattan"]
+N_to_eval = [5, 10, 20, 40, 70, 100]
+
+r2 = np.zeros((len(metrics_to_eval), len(N_to_eval)))
+MSE = np.zeros((len(metrics_to_eval), len(N_to_eval)))
+
+melhor_r2 = float('-inf')
+melhor_metrica = None
+melhor_N = None
+melhor_metrica_index = None
+melhor_N_index = None
+
+for i, m in enumerate(metrics_to_eval):
+    for j, n in enumerate(N_to_eval):
+        
+        KNN_regression_model = KNeighborsRegressor(n_neighbors=n, metric=m)
+        KNN_regression_model.fit(X_train, y_train)
+
+        y_pred = KNN_regression_model.predict(X_test)
+        
+        r2[i,j] = r2_score(y_test, y_pred)
+        MSE[i,j] = mean_squared_error(y_test, y_pred)
+        
+        if r2[i,j] > melhor_r2:
+            melhor_r2 = r2[i,j]
+            melhor_metrica = m
+            melhor_N = n
+            melhor_metrica_index = i
+            melhor_N_index = j
+
+print("O melhor valor para N é:", melhor_N)
+print("A melhor métrica é:", melhor_metrica)
+print("Para esse N e essa métrica, temos:")
+print("MSE:", MSE[melhor_metrica_index,melhor_N_index])
+print("R2_score:", r2[melhor_metrica_index,melhor_N_index])# %%
+
+#%% Modelo escolhido
+KNN_regression_model = KNeighborsRegressor(n_neighbors=melhor_N, metric=melhor_metrica)
+KNN_regression_model.fit(X_train, y_train)   
+
+#%% Avaliação K-folf, K = 10
+
+# Escalando os dados para aplicação do KFold
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+kf = KFold(n_splits=10, shuffle=True, random_state=42)
+
+# Listas para armazenar métricas
+mse_scores = []
+r2_scores = []
+
+for train_index, test_index in kf.split(X_scaled):
+    X_train, X_test = X_scaled[train_index], X_scaled[test_index]
+    y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+
+    KNN_regression_model = KNeighborsRegressor(n_neighbors=melhor_N, metric=melhor_metrica)
+    KNN_regression_model.fit(X_train, y_train)
+    y_pred = KNN_regression_model.predict(X_test)
+
+    mse_scores.append(mean_squared_error(y_test, y_pred))
+    r2_scores.append(r2_score(y_test, y_pred))
+    
+# Média dos resultados
+mean_mse = np.mean(mse_scores)
+mean_r2 = np.mean(r2_scores)
+
+print("Resultados da Validação Cruzada K-Fold com Regressão Linear:")
+for i, (mse, r2) in enumerate(zip(mse_scores, r2_scores), 1):
+    print(f"Fold {i}: MSE = {mse:.4f}, R² = {r2:.4f}")
+print(f"\nMédia dos Folds: MSE = {mean_mse:.4f}, R² = {mean_r2:.4f}")
+  
+    
+#%% Primeiro treinamento ==========================================================================================
+# Considera apenas os atributos que apresentaram maior correlação com a variável alvo.
+# -----------------------------------------------------------
+
+# Define os atributos e a variável alvo
+target_column='Air_Quality'
+X = dataset[['CO', 'SO2','NO2','Temperature','Proximity_to_Industrial_Areas']]
+y = dataset[target_column]
+
+# Define a semente
+seed=42
+
+# Divide o dataset em treino e teste
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, random_state=seed)
+
+#%% Algoritmo iterativo para escolher melhor N e métrica
+
+metrics_to_eval = ["euclidean", "manhattan"]
+N_to_eval = [5, 10, 20, 40, 70, 100]
+
+r2 = np.zeros((len(metrics_to_eval), len(N_to_eval)))
+MSE = np.zeros((len(metrics_to_eval), len(N_to_eval)))
+
+melhor_r2 = float('-inf')
+melhor_metrica = None
+melhor_N = None
+melhor_metrica_index = None
+melhor_N_index = None
+
+for i, m in enumerate(metrics_to_eval):
+    for j, n in enumerate(N_to_eval):
+        
+        KNN_regression_model = KNeighborsRegressor(n_neighbors=n, metric=m)
+        KNN_regression_model.fit(X_train, y_train)
+
+        y_pred = KNN_regression_model.predict(X_test)
+        
+        r2[i,j] = r2_score(y_test, y_pred)
+        MSE[i,j] = mean_squared_error(y_test, y_pred)
+        
+        if r2[i,j] > melhor_r2:
+            melhor_r2 = r2[i,j]
+            melhor_metrica = m
+            melhor_N = n
+            melhor_metrica_index = i
+            melhor_N_index = j
+
+
+print("O melhor valor para N é:", melhor_N)
+print("A melhor métrica é:", melhor_metrica)
+print("Para esse N e essa métrica, temos:")
+print("MSE:", MSE[melhor_metrica_index,melhor_N_index])
+print("R2_score:", r2[melhor_metrica_index,melhor_N_index])# %%
+
+#%% Modelo escolhido
+KNN_regression_model = KNeighborsRegressor(n_neighbors=melhor_N, metric=melhor_metrica)
+KNN_regression_model.fit(X_train, y_train)   
+
+
+#%% Avaliação K-folf, K = 10
+
+# Escalando os dados para aplicação do KFold
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+kf = KFold(n_splits=10, shuffle=True, random_state=42)
+
+# Listas para armazenar métricas
+mse_scores = []
+r2_scores = []
+
+for train_index, test_index in kf.split(X_scaled):
+    X_train, X_test = X_scaled[train_index], X_scaled[test_index]
+    y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+
+    KNN_regression_model = KNeighborsRegressor(n_neighbors=melhor_N, metric=melhor_metrica)
+    KNN_regression_model.fit(X_train, y_train)
+    y_pred = KNN_regression_model.predict(X_test)
+
+    mse_scores.append(mean_squared_error(y_test, y_pred))
+    r2_scores.append(r2_score(y_test, y_pred))
+    
+# Média dos resultados
+mean_mse = np.mean(mse_scores)
+mean_r2 = np.mean(r2_scores)
+
+print("Resultados da Validação Cruzada K-Fold com Regressão Linear:")
+for i, (mse, r2) in enumerate(zip(mse_scores, r2_scores), 1):
+    print(f"Fold {i}: MSE = {mse:.4f}, R² = {r2:.4f}")
+print(f"\nMédia dos Folds: MSE = {mean_mse:.4f}, R² = {mean_r2:.4f}")
+  
+
