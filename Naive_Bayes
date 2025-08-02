@@ -9,9 +9,7 @@
 
 """
 Esse script tem como objetivo ler o dataset selecionado e aplicar o algoritmo Naive Bayes.
-São realizados dois treinamentos: 1) com todos os atributos
-                                  2) com apenas os atributos de maior correlação com a variável alvo
-         
+É realizado um treinamento considerando todos os atributos.       
 """
 
 #%% Imports ==========================================================================================
