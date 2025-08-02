@@ -9,9 +9,10 @@
 
 """
 Esse script tem como objetivo ler o dataset selecionado e aplicar o algoritmo Regressão Linear.
-São realizados dois treinamentos: 1) com todos os atributos
+São realizados três treinamentos: 1) com todos os atributos
                                   2) com apenas os atributos de maior correlação com a variável alvo
-         
+                                  3) com apenas o atributo que apresentou maior importância para a 
+                                     regressão (muito mais que os demais)
 """
 
 #%% Imports ==========================================================================================
