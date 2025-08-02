@@ -205,7 +205,7 @@ for i, (mse, r2) in enumerate(zip(mse_scores, r2_scores), 1):
 print(f"\nMédia dos Folds: MSE = {mean_mse:.4f}, R² = {mean_r2:.4f}")
   
     
-#%% Primeiro treinamento ==========================================================================================
+#%% Segundo treinamento ==========================================================================================
 # Considera apenas os atributos que apresentaram maior correlação com a variável alvo.
 # -----------------------------------------------------------
 
